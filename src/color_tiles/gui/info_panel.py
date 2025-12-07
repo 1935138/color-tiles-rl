@@ -1,6 +1,6 @@
 """Information panel widget for game status display."""
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
@@ -14,7 +14,8 @@ class InfoPanel(QWidget):
 
         # 레이블들
         self._score_label = None
-        self._time_label = None
+        self._time_bar = None
+        self._time_text = None
         self._tiles_label = None
         self._state_label = None
 
@@ -60,9 +61,43 @@ class InfoPanel(QWidget):
         self._score_label = self._create_info_label("점수: 0")
         layout.addWidget(self._score_label)
 
-        # 남은 시간
-        self._time_label = self._create_info_label("시간: 120.0초")
-        layout.addWidget(self._time_label)
+        # 남은 시간 - 프로그레스 바
+        time_container = QWidget()
+        time_layout = QVBoxLayout()
+        time_layout.setContentsMargins(0, 0, 0, 0)
+        time_layout.setSpacing(2)
+
+        # 레이블 (상단)
+        self._time_text = QLabel("시간: 120.0초")
+        font = QFont("MS Sans Serif", 9)
+        self._time_text.setFont(font)
+        time_layout.addWidget(self._time_text)
+
+        # 프로그레스 바 (하단)
+        self._time_bar = QProgressBar()
+        self._time_bar.setMinimum(0)
+        self._time_bar.setMaximum(120)  # INITIAL_TIME
+        self._time_bar.setValue(120)
+        self._time_bar.setTextVisible(False)  # 텍스트는 위에 별도 표시
+        self._time_bar.setFixedHeight(20)
+
+        # Windows Classic 스타일 프로그레스 바
+        self._time_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #808080;
+                border-radius: 0px;
+                background-color: #ffffff;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #0000aa;  /* 파란색 */
+                width: 1px;
+            }
+        """)
+
+        time_layout.addWidget(self._time_bar)
+        time_container.setLayout(time_layout)
+        layout.addWidget(time_container)
 
         # 남은 타일
         self._tiles_label = self._create_info_label("타일: 200개")
@@ -107,16 +142,51 @@ class InfoPanel(QWidget):
         self._score_label.setText(f"점수: {score}")
 
     def update_time(self, remaining_time: float):
-        """시간 업데이트."""
-        self._time_label.setText(f"시간: {remaining_time:.1f}초")
+        """시간 업데이트 - 프로그레스 바 + 텍스트."""
+        # 텍스트 업데이트
+        self._time_text.setText(f"시간: {remaining_time:.1f}초")
 
-        # 시간이 얼마 안 남으면 빨간색으로 표시
+        # 프로그레스 바 값 업데이트
+        bar_value = int(remaining_time)  # 소수점 버림
+        self._time_bar.setValue(bar_value)
+
+        # 시간에 따라 색상 변경
         if remaining_time <= 10:
-            self._time_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
+            # 10초 이하: 빨간색
+            self._time_text.setStyleSheet("QLabel { color: red; font-weight: bold; }")
+            self._time_bar.setStyleSheet("""
+                QProgressBar {
+                    border: 2px solid #808080;
+                    background-color: #ffffff;
+                }
+                QProgressBar::chunk {
+                    background-color: #ff0000;  /* 빨간색 */
+                }
+            """)
         elif remaining_time <= 30:
-            self._time_label.setStyleSheet("QLabel { color: orange; }")
+            # 30초 이하: 주황색
+            self._time_text.setStyleSheet("QLabel { color: orange; }")
+            self._time_bar.setStyleSheet("""
+                QProgressBar {
+                    border: 2px solid #808080;
+                    background-color: #ffffff;
+                }
+                QProgressBar::chunk {
+                    background-color: #ff8800;  /* 주황색 */
+                }
+            """)
         else:
-            self._time_label.setStyleSheet("")
+            # 30초 초과: 파란색 (기본)
+            self._time_text.setStyleSheet("")
+            self._time_bar.setStyleSheet("""
+                QProgressBar {
+                    border: 2px solid #808080;
+                    background-color: #ffffff;
+                }
+                QProgressBar::chunk {
+                    background-color: #0000aa;  /* 파란색 */
+                }
+            """)
 
     def update_tiles(self, remaining_tiles: int):
         """남은 타일 수 업데이트."""

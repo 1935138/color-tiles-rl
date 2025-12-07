@@ -41,9 +41,8 @@ class ColorTilesObserver(GameObserver):
         # 점수 및 타일 수 업데이트
         self.window.update_info_display()
 
-        # 실패한 이동에 대한 메시지 표시
-        if not result.success:
-            self.window.show_message("잘못된 이동", result.message)
+        # 실패한 이동: 팝업 제거 (시간 패널티만 자동 적용됨)
+        # game.py Line 186에서 이미 PENALTY_TIME(10초) 감소 처리
 
     def on_game_state_changed(self, state):
         """게임 상태 변경 시 호출."""
