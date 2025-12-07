@@ -82,7 +82,7 @@ Color Tiles 게임에 강화학습을 적용하여 AI가 자동으로 게임을 
 | **Environment** | ColorTilesEnv | Gymnasium 기반 Color Tiles 게임 환경 |
 | **State** | Box(0, 10, (15, 23), int8) 또는<br>Box(0, 1, (15, 23, 11), float32) | **옵션 1**: 2D 그리드 (0=빈셀, 1-10=색상)<br>**옵션 2**: One-hot 인코딩 (11채널)<br>**추가 정보**: 남은 시간, 남은 타일 수 |
 | **Action** | Discrete(345) | 23×15=345개 셀 위치<br>action → (row, col) 변환 필요 |
-| **Reward** | 타일 제거 기반 | **타일 제거**: +1.0 × 타일 수<br>**무효 이동**: -10.0<br>**승리**: +100.0<br>**패배**: -(남은 타일 × 10) |
+| **Reward** | 타일 제거 기반 | **타일 제거**: +1.0 × 타일 수<br>**무효 이동**: -10.0<br>**승리**: +100.0<br>**패배**: -(남은 타일 × 2) |
 
 #### 3.1.2 Episode 설정
 
@@ -151,7 +151,7 @@ def action_to_position(action: int) -> Position:
 | **타일 제거 Reward** | 유효한 action으로 타일 제거 | `+1.0 × 타일 수` | 타일 제거 행동 강화 |
 | **무효 이동 Penalty** | (1) 타일이 있는 셀 클릭<br>(2) 제거 가능한 타일이 없는 경우 | `-10.0` | 잘못된 action 억제 |
 | **승리 Bonus** | 모든 타일 제거 성공 | `+100.0` | 목표 달성 강화 |
-| **패배 Penalty** | 시간 소진 또는 막힘 | `-(남은 타일 × 10)` | 많은 타일 제거 유도 |
+| **패배 Penalty** | 시간 소진 또는 막힘 | `-(남은 타일 × 2)` | 많은 타일 제거 유도 |
 
 #### 3.4.2 Reward 계산 예시
 
@@ -162,7 +162,7 @@ def action_to_position(action: int) -> Position:
 | 4개 타일 제거 | 4×1.0 = 4.0 | **+4.0** |
 | 무효 이동 | -10.0 | **-10.0** |
 | 게임 승리 (200개 제거) | 200×1.0 + 100.0 = 300.0 | **+300.0** |
-| 게임 패배 (50개 남음) | 150×1.0 - (50×10) = -350.0 | **-350.0** |
+| 게임 패배 (50개 남음) | 150×1.0 - (50×2) = 50.0 | **+50.0** |
 
 #### 3.4.3 Reward 계산 코드
 
@@ -194,7 +194,7 @@ def calculate_reward(move_result: MoveResult, game_state: GameState,
     if game_state == GameState.WON:
         reward += 100.0  # 승리 bonus
     elif game_state in [GameState.LOST_TIME, GameState.LOST_NO_MOVES]:
-        reward -= remaining_tiles * 10  # 남은 타일에 비례한 패배 penalty
+        reward -= remaining_tiles * 2  # 남은 타일에 비례한 패배 penalty
 
     return reward
 ```
