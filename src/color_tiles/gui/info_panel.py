@@ -26,18 +26,34 @@ class InfoPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        # 타이틀
+        # 타이틀 - Windows Classic 스타일
         title_label = QLabel("Color Tiles")
-        title_font = QFont()
-        title_font.setPointSize(20)
+        title_font = QFont("MS Sans Serif", 16)
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Raised 효과 테두리
+        title_label.setStyleSheet("""
+            QLabel {
+                padding: 8px;
+                background-color: #c0c0c0;
+                border-top: 2px solid #ffffff;
+                border-left: 2px solid #ffffff;
+                border-bottom: 2px solid #404040;
+                border-right: 2px solid #404040;
+            }
+        """)
         layout.addWidget(title_label)
 
-        # 구분선
-        separator = QLabel("─" * 30)
-        separator.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # 구분선 - Classic groove 스타일
+        separator = QLabel()
+        separator.setFixedHeight(4)
+        separator.setStyleSheet("""
+            QLabel {
+                border-top: 1px solid #808080;
+                border-bottom: 1px solid #ffffff;
+            }
+        """)
         layout.addWidget(separator)
 
         # 점수
@@ -63,21 +79,24 @@ class InfoPanel(QWidget):
         self.setFixedWidth(250)
 
     def _create_info_label(self, text: str, is_status: bool = False) -> QLabel:
-        """정보 레이블 생성."""
+        """정보 레이블 생성 - Windows Classic 스타일."""
         label = QLabel(text)
-        font = QFont()
-        font.setPointSize(12 if not is_status else 14)
+        font = QFont("MS Sans Serif", 10 if not is_status else 11)
         if is_status:
             font.setBold(True)
         label.setFont(font)
         label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         if is_status:
+            # Sunken 효과 (움푹 들어간 상태 표시 영역)
             label.setStyleSheet("""
                 QLabel {
-                    padding: 10px;
-                    background-color: #e0e0e0;
-                    border-radius: 5px;
+                    padding: 8px;
+                    background-color: #ffffff;
+                    border-top: 2px solid #808080;
+                    border-left: 2px solid #808080;
+                    border-bottom: 2px solid #ffffff;
+                    border-right: 2px solid #ffffff;
                 }
             """)
 
@@ -103,14 +122,17 @@ class InfoPanel(QWidget):
         """남은 타일 수 업데이트."""
         self._tiles_label.setText(f"타일: {remaining_tiles}개")
 
-    def update_state(self, state_text: str, color: str = "#333"):
-        """게임 상태 업데이트."""
+    def update_state(self, state_text: str, color: str = "#000000"):
+        """게임 상태 업데이트 - Windows Classic 스타일."""
         self._state_label.setText(f"상태: {state_text}")
         self._state_label.setStyleSheet(f"""
             QLabel {{
-                padding: 10px;
-                background-color: #e0e0e0;
-                border-radius: 5px;
+                padding: 8px;
+                background-color: #ffffff;
+                border-top: 2px solid #808080;
+                border-left: 2px solid #808080;
+                border-bottom: 2px solid #ffffff;
+                border-right: 2px solid #ffffff;
                 color: {color};
             }}
         """)
@@ -129,4 +151,4 @@ class InfoPanel(QWidget):
 
     def set_ready_state(self):
         """대기 중 상태 표시."""
-        self.update_state("대기 중", "#666")
+        self.update_state("대기 중", "#000000")

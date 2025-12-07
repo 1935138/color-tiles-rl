@@ -27,56 +27,48 @@ class ControlPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        # Start 버튼
-        self._start_button = QPushButton("게임 시작")
-        self._start_button.setFixedHeight(50)
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-        self._start_button.setFont(font)
-        self._start_button.setStyleSheet("""
+        # Windows Classic 버튼 스타일
+        classic_button_style = """
             QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 5px;
+                background-color: #c0c0c0;
+                color: #000000;
+                border-top: 2px solid #ffffff;
+                border-left: 2px solid #ffffff;
+                border-bottom: 2px solid #404040;
+                border-right: 2px solid #404040;
+                padding: 4px 8px;
             }
             QPushButton:hover {
-                background-color: #45a049;
+                background-color: #d0d0d0;
             }
             QPushButton:pressed {
-                background-color: #3d8b40;
+                background-color: #a0a0a0;
+                border-top: 2px solid #404040;
+                border-left: 2px solid #404040;
+                border-bottom: 2px solid #ffffff;
+                border-right: 2px solid #ffffff;
             }
             QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
+                color: #808080;
+                background-color: #c0c0c0;
             }
-        """)
+        """
+
+        # Start 버튼
+        self._start_button = QPushButton("게임 시작")
+        self._start_button.setFixedHeight(40)
+        font = QFont("MS Sans Serif", 10)
+        font.setBold(True)
+        self._start_button.setFont(font)
+        self._start_button.setStyleSheet(classic_button_style)
         self._start_button.clicked.connect(self.start_clicked.emit)
         layout.addWidget(self._start_button)
 
         # Reset 버튼
         self._reset_button = QPushButton("새 게임")
-        self._reset_button.setFixedHeight(50)
+        self._reset_button.setFixedHeight(40)
         self._reset_button.setFont(font)
-        self._reset_button.setStyleSheet("""
-            QPushButton {
-                background-color: #FF9800;
-                color: white;
-                border: none;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #e68900;
-            }
-            QPushButton:pressed {
-                background-color: #cc7a00;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
-            }
-        """)
+        self._reset_button.setStyleSheet(classic_button_style)
         self._reset_button.clicked.connect(self.reset_clicked.emit)
         layout.addWidget(self._reset_button)
 

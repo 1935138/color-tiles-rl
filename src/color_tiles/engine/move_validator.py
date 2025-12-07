@@ -55,11 +55,14 @@ class MoveValidator:
                 color_groups[tile.color] = []
             color_groups[tile.color].append(tile)
 
-        # 2개 이상인 색상 찾기
+        # 2개 이상인 모든 색상의 타일 수집
+        tiles_to_remove = []
         for color, tiles in color_groups.items():
             if len(tiles) >= MIN_TILES_FOR_REMOVAL:
-                return True, tiles
+                tiles_to_remove.extend(tiles)
 
+        if tiles_to_remove:
+            return True, tiles_to_remove
         return False, []
 
     def find_all_valid_moves(self) -> list[Position]:

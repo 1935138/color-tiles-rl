@@ -87,41 +87,64 @@ class BoardWidget(QWidget):
                 button = self._cell_buttons[row][col]
 
                 if color_name is None:
-                    # 빈칸
+                    # 빈칸: Sunken 스타일
                     color = self.EMPTY_COLOR
+                    button.setStyleSheet(self._get_cell_style(color, is_empty=True))
                 else:
-                    # 타일
+                    # 타일: Raised 스타일 + 색상
                     color_enum = Color[color_name]
                     color = self.COLOR_MAP[color_enum]
+                    button.setStyleSheet(self._get_cell_style(color, is_empty=False))
 
-                button.setStyleSheet(self._get_cell_style(color))
-
-    def _get_cell_style(self, color: QColor) -> str:
-        """셀 버튼의 스타일시트 생성."""
+    def _get_cell_style(self, color: QColor, is_empty: bool = False) -> str:
+        """셀 버튼의 Windows Classic 스타일시트 생성."""
         r, g, b = color.red(), color.green(), color.blue()
 
-        # 호버 효과를 위한 밝은 색상
-        hover_color = QColor(
-            min(r + 20, 255),
-            min(g + 20, 255),
-            min(b + 20, 255)
-        )
-        hr, hg, hb = hover_color.red(), hover_color.green(), hover_color.blue()
+        if is_empty:
+            # 빈 칸: Sunken 효과 (움푹 들어간)
+            return """
+                QPushButton {
+                    background-color: #c0c0c0;
+                    border-top: 2px solid #808080;
+                    border-left: 2px solid #808080;
+                    border-bottom: 2px solid #ffffff;
+                    border-right: 2px solid #ffffff;
+                }
+                QPushButton:hover {
+                    background-color: #d4d4d4;
+                }
+                QPushButton:pressed {
+                    background-color: #a0a0a0;
+                }
+            """
+        else:
+            # 타일: Raised 효과 (볼록한) + 게임 색상 유지
+            # 색상 기반 하이라이트/섀도우 계산
+            highlight_r = min(r + 60, 255)
+            highlight_g = min(g + 60, 255)
+            highlight_b = min(b + 60, 255)
+            shadow_r = max(r - 80, 0)
+            shadow_g = max(g - 80, 0)
+            shadow_b = max(b - 80, 0)
 
-        return f"""
-            QPushButton {{
-                background-color: rgb({r}, {g}, {b});
-                border: 1px solid #999;
-                border-radius: 3px;
-            }}
-            QPushButton:hover {{
-                background-color: rgb({hr}, {hg}, {hb});
-                border: 2px solid #333;
-            }}
-            QPushButton:pressed {{
-                background-color: rgb({max(r-30, 0)}, {max(g-30, 0)}, {max(b-30, 0)});
-            }}
-        """
+            return f"""
+                QPushButton {{
+                    background-color: rgb({r}, {g}, {b});
+                    border-top: 2px solid rgb({highlight_r}, {highlight_g}, {highlight_b});
+                    border-left: 2px solid rgb({highlight_r}, {highlight_g}, {highlight_b});
+                    border-bottom: 2px solid rgb({shadow_r}, {shadow_g}, {shadow_b});
+                    border-right: 2px solid rgb({shadow_r}, {shadow_g}, {shadow_b});
+                }}
+                QPushButton:hover {{
+                    border-width: 3px;
+                }}
+                QPushButton:pressed {{
+                    border-top: 2px solid rgb({shadow_r}, {shadow_g}, {shadow_b});
+                    border-left: 2px solid rgb({shadow_r}, {shadow_g}, {shadow_b});
+                    border-bottom: 2px solid rgb({highlight_r}, {highlight_g}, {highlight_b});
+                    border-right: 2px solid rgb({highlight_r}, {highlight_g}, {highlight_b});
+                }}
+            """
 
     def set_enabled(self, enabled: bool):
         """보드 전체 활성화/비활성화."""
