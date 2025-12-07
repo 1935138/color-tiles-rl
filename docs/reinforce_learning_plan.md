@@ -82,7 +82,7 @@ Color Tiles 게임에 강화학습을 적용하여 AI가 자동으로 게임을 
 | **Environment** | ColorTilesEnv | Gymnasium 기반 Color Tiles 게임 환경 |
 | **State** | Box(0, 10, (15, 23), int8) 또는<br>Box(0, 1, (15, 23, 11), float32) | **옵션 1**: 2D 그리드 (0=빈셀, 1-10=색상)<br>**옵션 2**: One-hot 인코딩 (11채널)<br>**추가 정보**: 남은 시간, 남은 타일 수 |
 | **Action** | Discrete(345) | 23×15=345개 셀 위치<br>action → (row, col) 변환 필요 |
-| **Reward** | 타일 제거 기반 | **성공**: +1.0 × 타일 수<br>**다중 제거**: +(개수-3)×0.5 보너스<br>**무효 이동**: -5.0 (학습 신호)<br>**승리**: +100.0<br>**패배**: -50.0<br>**진행 보상**: 타일 감소 비율×0.1 |
+| **Reward** | 타일 제거 기반 | **타일 제거**: +1.0 × 타일 수<br>**무효 이동**: -10.0<br>**승리**: +100.0<br>**패배**: -(남은 타일 × 10) |
 
 #### 3.1.2 Episode 설정
 
@@ -92,6 +92,12 @@ Color Tiles 게임에 강화학습을 적용하여 AI가 자동으로 게임을 
 | **Max Steps per Episode** | 200 | 무한 루프 방지 |
 | **Initial State** | 랜덤 보드 생성 | BoardGenerator 사용<br>10색상 × 20타일 = 200개 |
 | **Time Limit** | 120초 | 게임 규칙과 동일 |
+
+**Max Steps 설정 근거:**
+- 총 타일 수(200개)와 동일하게 설정하여 충분한 시도 기회 제공
+- 이론적 최소 step 수는 100회(매번 2개씩 제거)이지만, 학습 초기 무효 action을 고려
+- 학습 후기에는 60-80 step 내에 완료 가능하지만, 초기 학습 단계의 exploration을 위한 여유 확보
+- 실제로는 Time Limit(120초)가 먼저 도달하는 경우가 많을 것으로 예상
 
 ### 3.2 State
 
@@ -142,23 +148,21 @@ def action_to_position(action: int) -> Position:
 
 | Reward 유형 | 조건 | Reward 값 | 목적 |
 |----------|------|--------|------|
-| **기본 제거 Reward** | 유효한 action으로 타일 제거 | `+1.0 × 타일 수` | 타일 제거 행동 강화 |
-| **다중 제거 Bonus** | 4개 이상 타일 한번에 제거 | `+(타일 수 - 3) × 0.5` | 효율적인 action 장려 |
-| **무효 이동 Penalty** | 무효한 위치 클릭 | `-5.0` | 잘못된 action 억제 |
+| **타일 제거 Reward** | 유효한 action으로 타일 제거 | `+1.0 × 타일 수` | 타일 제거 행동 강화 |
+| **무효 이동 Penalty** | (1) 타일이 있는 셀 클릭<br>(2) 제거 가능한 타일이 없는 경우 | `-10.0` | 잘못된 action 억제 |
 | **승리 Bonus** | 모든 타일 제거 성공 | `+100.0` | 목표 달성 강화 |
-| **패배 Penalty** | 시간 소진 또는 막힘 | `-50.0` | 실패 방지 |
-| **진행 Reward (Shaping)** | 타일이 줄어들 때마다 | `+(1 - 남은타일/200) × 0.1` | 목표 방향 유도 |
+| **패배 Penalty** | 시간 소진 또는 막힘 | `-(남은 타일 × 10)` | 많은 타일 제거 유도 |
 
 #### 3.4.2 Reward 계산 예시
 
 | 상황 | 계산 | 총 보상 |
 |------|------|---------|
 | 2개 타일 제거 | 2×1.0 = 2.0 | **+2.0** |
-| 4개 타일 제거 | 4×1.0 + (4-3)×0.5 = 4.5 | **+4.5** |
-| 5개 타일 제거 | 5×1.0 + (5-3)×0.5 = 6.0 | **+6.0** |
-| 무효 이동 | -5.0 | **-5.0** |
-| 게임 승리 (50개 제거) | 50×1.0 + 100.0 = 150.0 | **+150.0** |
-| 게임 패배 (150개 제거) | 150×1.0 - 50.0 = 100.0 | **+100.0** |
+| 3개 타일 제거 | 3×1.0 = 3.0 | **+3.0** |
+| 4개 타일 제거 | 4×1.0 = 4.0 | **+4.0** |
+| 무효 이동 | -10.0 | **-10.0** |
+| 게임 승리 (200개 제거) | 200×1.0 + 100.0 = 300.0 | **+300.0** |
+| 게임 패배 (50개 남음) | 150×1.0 - (50×10) = -350.0 | **-350.0** |
 
 #### 3.4.3 Reward 계산 코드
 
@@ -178,27 +182,19 @@ def calculate_reward(move_result: MoveResult, game_state: GameState,
     """
     reward = 0.0
 
-    # 1. 기본 타일 제거 reward
+    # 1. 타일 제거 reward
     if move_result.success:
         tiles_removed = len(move_result.removed_tiles)
         reward += tiles_removed * 1.0  # 제거된 타일 수에 비례
-
-        # 2. 다중 제거 bonus
-        if tiles_removed >= 4:
-            reward += (tiles_removed - 3) * 0.5
     else:
-        # 3. 무효 action penalty (Agent 학습 신호)
-        reward -= 5.0
+        # 2. 무효 action penalty
+        reward -= 10.0
 
-    # 4. Episode 종료 reward
+    # 3. Episode 종료 reward
     if game_state == GameState.WON:
         reward += 100.0  # 승리 bonus
     elif game_state in [GameState.LOST_TIME, GameState.LOST_NO_MOVES]:
-        reward -= 50.0  # 패배 penalty
-
-    # 5. Reward shaping (목표 방향 유도)
-    remaining_ratio = remaining_tiles / 200
-    reward += (1 - remaining_ratio) * 0.1
+        reward -= remaining_tiles * 10  # 남은 타일에 비례한 패배 penalty
 
     return reward
 ```
