@@ -12,6 +12,14 @@ from color_tiles.utils.board_generator import BoardGenerator
 from color_tiles.gui.board_widget import BoardWidget
 from color_tiles.gui.info_panel import InfoPanel
 from color_tiles.gui.control_panel import ControlPanel
+from color_tiles.gui.ai_control_panel import AIControlPanel
+from color_tiles.gui.ai_status_panel import AIStatusPanel
+
+try:
+    from rl.inference.ai_player import AIPlayer
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
 
 
 class ColorTilesObserver(GameObserver):
@@ -70,9 +78,18 @@ class MainWindow(QMainWindow):
         self.board_widget = None
         self.info_panel = None
         self.control_panel = None
+        self.ai_control_panel = None
+        self.ai_status_panel = None
 
         # 타이머
         self.timer = None
+
+        # AI 플레이어
+        self.ai_player = None
+        self.ai_timer = None
+        self.ai_playing = False
+        self.ai_speed = 5  # 액션/초
+        self.ai_step_count = 0
 
         self._init_game()
         self._init_ui()
@@ -111,6 +128,14 @@ class MainWindow(QMainWindow):
         self.control_panel = ControlPanel()
         right_layout.addWidget(self.control_panel)
 
+        # AI 패널
+        if AI_AVAILABLE:
+            self.ai_control_panel = AIControlPanel()
+            right_layout.addWidget(self.ai_control_panel)
+
+            self.ai_status_panel = AIStatusPanel()
+            right_layout.addWidget(self.ai_status_panel)
+
         right_layout.addStretch()
 
         right_panel.setLayout(right_layout)
@@ -131,6 +156,13 @@ class MainWindow(QMainWindow):
         # 컨트롤 버튼
         self.control_panel.start_clicked.connect(self.on_start_game)
         self.control_panel.reset_clicked.connect(self.on_reset_game)
+
+        # AI 컨트롤
+        if AI_AVAILABLE and self.ai_control_panel:
+            self.ai_control_panel.checkpoint_selected.connect(self.on_checkpoint_selected)
+            self.ai_control_panel.ai_play_clicked.connect(self.on_ai_play)
+            self.ai_control_panel.ai_stop_clicked.connect(self.on_ai_stop)
+            self.ai_control_panel.speed_changed.connect(self.on_ai_speed_changed)
 
     def _start_timer(self):
         """시간 업데이트 타이머 시작."""
@@ -225,8 +257,104 @@ class MainWindow(QMainWindow):
         """메시지 다이얼로그 표시."""
         QMessageBox.information(self, title, message)
 
+    def on_checkpoint_selected(self, checkpoint_name: str):
+        """체크포인트 선택 핸들러."""
+        if not AI_AVAILABLE:
+            return
+
+        checkpoint_path = self.ai_control_panel.get_selected_checkpoint()
+        if checkpoint_path and checkpoint_path != "(체크포인트 없음)":
+            try:
+                self.ai_player = AIPlayer(checkpoint_path)
+                self.show_message("AI 로드 완료", f"체크포인트 로드 성공:\n{checkpoint_name}")
+            except Exception as e:
+                self.show_message("오류", f"AI 로드 실패:\n{str(e)}")
+                self.ai_player = None
+
+    def on_ai_play(self):
+        """AI 플레이 시작."""
+        if not AI_AVAILABLE or not self.ai_player:
+            self.show_message("오류", "먼저 체크포인트를 선택하세요")
+            return
+
+        # 게임이 진행 중이 아니면 시작
+        if self.game.get_game_state() != GameState.PLAYING:
+            self.on_start_game()
+
+        self.ai_playing = True
+        self.ai_control_panel.set_playing_state(True)
+        self.board_widget.set_enabled(False)  # 수동 클릭 비활성화
+
+        # AI 타이머 시작
+        self.ai_timer = QTimer()
+        self.ai_timer.timeout.connect(self.ai_step)
+        interval_ms = int(1000 / self.ai_speed)
+        self.ai_timer.start(interval_ms)
+
+    def on_ai_stop(self):
+        """AI 플레이 중지."""
+        self.ai_playing = False
+        self.ai_control_panel.set_playing_state(False)
+        self.board_widget.set_enabled(True)
+
+        if self.ai_timer:
+            self.ai_timer.stop()
+            self.ai_timer = None
+
+        self.ai_status_panel.clear()
+        self.board_widget.clear_highlight()
+
+    def on_ai_speed_changed(self, speed: int):
+        """AI 속도 변경."""
+        self.ai_speed = speed
+        if self.ai_timer and self.ai_timer.isActive():
+            interval_ms = int(1000 / speed)
+            self.ai_timer.setInterval(interval_ms)
+
+    def ai_step(self):
+        """AI 한 스텝 실행 (타이머 콜백)."""
+        if not self.ai_playing or self.game.get_game_state() != GameState.PLAYING:
+            self.on_ai_stop()
+            return
+
+        try:
+            # AI로부터 action 가져오기
+            board = self.game.get_board()
+            action, value, action_probs = self.ai_player.get_action(board)
+            position = self.ai_player.action_to_position(action)
+
+            # 신뢰도 계산
+            confidence = action_probs[action] if action_probs is not None else 0.0
+
+            # 상태 표시 업데이트
+            self.ai_step_count += 1
+            self.ai_status_panel.update_status(
+                self.ai_step_count, value, confidence, position
+            )
+
+            # 다음 행동 하이라이트
+            self.board_widget.highlight_cell(position, confidence)
+
+            # 액션 실행
+            result = self.game.make_move(position)
+
+            # 게임 종료 체크
+            if self.game.get_game_state() != GameState.PLAYING:
+                self.on_ai_stop()
+                self.ai_step_count = 0
+
+        except Exception as e:
+            print(f"AI step error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.on_ai_stop()
+
     def closeEvent(self, event):
         """윈도우 닫기 이벤트."""
+        # AI 플레이 중이면 중지
+        if self.ai_playing:
+            self.on_ai_stop()
+
         reply = QMessageBox.question(
             self,
             "종료",

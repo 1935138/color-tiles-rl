@@ -5,7 +5,13 @@ description = "Color Tiles puzzle game with PyQt6 GUI"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "gymnasium>=1.2.2",
     "PyQt6>=6.4.0",
+    "rich>=14.2.0",
+    "stable-baselines3>=2.7.1",
+    "tensorboard>=2.20.0",
+    "torch>=2.9.1",
+    "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]

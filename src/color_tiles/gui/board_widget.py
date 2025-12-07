@@ -40,6 +40,10 @@ class BoardWidget(QWidget):
         # 셀 버튼들을 저장할 2D 리스트
         self._cell_buttons = []
 
+        # AI 하이라이트 추적
+        self._highlighted_button = None
+        self._highlighted_position = None
+
         self._init_ui()
 
     def _init_ui(self):
@@ -151,3 +155,64 @@ class BoardWidget(QWidget):
         for row in self._cell_buttons:
             for button in row:
                 button.setEnabled(enabled)
+
+    def highlight_cell(self, position: Position, confidence: float):
+        """
+        AI가 선택할 셀을 하이라이트.
+
+        Args:
+            position: 하이라이트할 Position
+            confidence: AI의 신뢰도 (0.0-1.0)
+        """
+        # 이전 하이라이트 제거
+        if self._highlighted_button and self._highlighted_position:
+            # 보드 업데이트를 통해 원래 스타일로 복원
+            # (여기서는 간단히 처리)
+            pass
+
+        # 새 하이라이트 적용
+        button = self._cell_buttons[position.row][position.col]
+        highlight_color = self._get_confidence_color(confidence)
+
+        # 기존 스타일에 굵은 테두리 추가
+        current_style = button.styleSheet()
+        button.setStyleSheet(current_style + f"""
+            QPushButton {{
+                border: 4px solid {highlight_color} !important;
+            }}
+        """)
+
+        self._highlighted_button = button
+        self._highlighted_position = position
+
+    def clear_highlight(self):
+        """하이라이트 제거."""
+        if self._highlighted_button and self._highlighted_position:
+            # 원래 색상으로 복원하려면 보드를 다시 그려야 함
+            # 간단하게 스타일 재설정
+            row = self._highlighted_position.row
+            col = self._highlighted_position.col
+            button = self._cell_buttons[row][col]
+
+            # 기본 스타일로 재설정 (빈칸으로 가정)
+            button.setStyleSheet(self._get_cell_style(self.EMPTY_COLOR, is_empty=True))
+
+            self._highlighted_button = None
+            self._highlighted_position = None
+
+    def _get_confidence_color(self, confidence: float) -> str:
+        """
+        신뢰도에 따른 하이라이트 색상 반환.
+
+        Args:
+            confidence: 0.0-1.0 범위의 신뢰도
+
+        Returns:
+            색상 문자열 (CSS 형식)
+        """
+        if confidence > 0.8:
+            return "#00FF00"  # 밝은 녹색 (높은 신뢰도)
+        elif confidence > 0.5:
+            return "#FFFF00"  # 노란색 (중간 신뢰도)
+        else:
+            return "#FF8800"  # 주황색 (낮은 신뢰도)

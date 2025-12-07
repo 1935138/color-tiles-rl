@@ -1,459 +1,386 @@
-# Color Tiles Game Engine
+# Color Tiles 강화학습 프로젝트
 
-순수 Python 게임 로직 엔진으로, GUI(PyQt6)와 완전히 분리된 Color Tiles 퍼즐 게임 구현입니다.
+Color Tiles 게임을 플레이하는 강화학습 AI를 학습하고 실행하는 프로젝트입니다.
 
-## 게임 규칙
+## 프로젝트 개요
 
-- **보드**: 23 × 15 그리드 (총 345칸)
-- **타일**: 10가지 색상 × 20개씩 = 200개
-- **빈칸**: 145개
-- **제한시간**: 120초
-- **조작**: 빈칸을 클릭하여 타일 제거
-- **제거 조건**: 클릭한 빈칸 기준 상하좌우 4방향에서 찾은 타일 중 같은 색상이 2개 이상이면 제거
-- **점수**: 타일 1개당 1점
-- **패널티**: 잘못된 이동 시 시간 10초 감소
-- **승리**: 모든 타일 제거
-- **패배**: 시간 초과 또는 유효한 이동 없음
+- **게임**: Color Tiles (23×15 보드, 10가지 색상, 200개 타일)
+- **알고리즘**: PPO (Proximal Policy Optimization)
+- **프레임워크**: Stable-Baselines3 + Gymnasium
+- **GUI**: PyQt6
 
-## 설치
+## 설치 방법
 
-### 요구사항
-
-- Python 3.10 이상
-- uv (빠른 Python 패키지 매니저)
-
-### uv 설치
+### 1. 기본 의존성 설치
 
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# pip로 설치
-pip install uv
+# Python 3.8 이상 필요
+pip install -e .
 ```
 
-### 프로젝트 설정
+### 2. 강화학습 의존성 설치
 
 ```bash
-# 프로젝트 클론
-git clone <repository-url>
-cd color_tiles
-
-# uv로 가상환경 생성
-uv venv
-
-# 가상환경 활성화
-# Linux/macOS:
-source .venv/bin/activate
-# Windows:
-.venv\Scripts\activate
-
-# 의존성 설치 (PyQt6)
-uv pip install -e .
+pip install gymnasium stable-baselines3 torch tensorboard
 ```
 
-## 빠른 시작
-
-### CLI 데모 실행
+또는:
 
 ```bash
-# uv로 실행 (가상환경 자동 활성화)
-uv run python examples/cli_demo.py
-
-# 또는 가상환경 활성화 후
-source .venv/bin/activate
-python examples/cli_demo.py
+pip install -r requirements-rl.txt
 ```
 
-터미널에서 간단한 텍스트 기반 게임을 플레이할 수 있습니다.
+## 사용 방법
 
-### 기본 사용법
+### 1. GUI로 게임 플레이 (사람)
 
-```python
-from color_tiles.utils.board_generator import BoardGenerator
-from color_tiles.engine.game import GameEngine
-from color_tiles.domain.models import Position
-
-# 1. 랜덤 보드 생성
-board = BoardGenerator.generate_random_board()
-
-# 2. 게임 엔진 초기화
-game = GameEngine(board)
-
-# 3. 게임 시작
-game.start_game()
-
-# 4. 이동 실행
-position = Position(row=5, col=10)
-result = game.make_move(position)
-
-print(f"성공: {result.success}")
-print(f"제거된 타일: {len(result.tiles_removed)}")
-print(f"획득 점수: {result.points_earned}")
-print(f"메시지: {result.message}")
-
-# 5. 게임 상태 조회
-print(f"현재 점수: {game.get_score()}")
-print(f"남은 시간: {game.get_remaining_time():.1f}초")
-print(f"게임 상태: {game.get_game_state()}")
+```bash
+python main.py
 ```
 
-## 아키텍처
+기본 게임 플레이:
+1. "게임 시작" 버튼 클릭
+2. 빈 셀을 클릭하여 타일 제거
+3. 120초 내에 모든 타일 제거 시 승리!
 
-### Clean Architecture
+---
 
-프로젝트는 3개 계층으로 구성됩니다:
+### 2. AI 학습
 
-```
-src/color_tiles/
-├── domain/          # 핵심 데이터 모델 및 상수
-│   ├── models.py    # Color, Position, Cell, GameState, MoveResult
-│   ├── constants.py # 게임 상수
-│   └── exceptions.py# 커스텀 예외
-├── engine/          # 게임 로직 및 상태 관리
-│   ├── board.py     # Board 상태 관리
-│   ├── tile_finder.py    # 4방향 타일 찾기 알고리즘
-│   ├── move_validator.py # 이동 유효성 검증
-│   └── game.py      # GameEngine (메인 Public API)
-└── utils/           # 유틸리티
-    └── board_generator.py # 랜덤 보드 생성
+#### 짧은 테스트 학습 (10K steps)
+
+```bash
+python -m rl.training.train --total-timesteps 10000 --n-envs 2
 ```
 
-## API 문서
+이 명령어는:
+- 10,000 timesteps 동안 학습
+- 2개의 병렬 환경 사용
+- 약 5-10분 소요 (CPU 기준)
+- 체크포인트를 `checkpoints/` 디렉토리에 저장
 
-### 핵심 클래스
+#### 본격 학습 (1M steps)
 
-#### GameEngine
-
-메인 게임 오케스트레이터로, GUI가 사용할 Primary API입니다.
-
-```python
-class GameEngine:
-    def __init__(self, board: Board, time_limit: float = 120.0)
-
-    # 게임 생명주기
-    def start_game(self) -> None
-    def reset_game(self, new_board: Optional[Board] = None) -> None
-
-    # 게임 진행
-    def make_move(self, position: Position) -> MoveResult
-
-    # 상태 조회
-    def get_game_state(self) -> GameState
-    def get_remaining_time(self) -> float
-    def get_score(self) -> int
-    def get_board_state(self) -> dict
-    def get_board(self) -> Board
-
-    # 옵저버 패턴
-    def add_observer(self, observer: GameObserver) -> None
-    def remove_observer(self, observer: GameObserver) -> None
+```bash
+python -m rl.training.train --total-timesteps 1000000 --n-envs 8
 ```
 
-#### Board
+이 명령어는:
+- 1,000,000 timesteps 동안 학습
+- 8개의 병렬 환경 사용
+- 약 10-20시간 소요 (CPU 기준)
+- 매 10,000 steps마다 체크포인트 저장
+- 매 5,000 steps마다 평가 수행
 
-보드 상태를 관리하는 핵심 클래스입니다.
+#### 학습 파라미터
 
-```python
-class Board:
-    def __init__(self, cells: list[list[Optional[Color]]])
-
-    def get_cell(self, position: Position) -> Cell
-    def is_empty(self, position: Position) -> bool
-    def remove_tiles(self, positions: list[Position]) -> int
-    def get_all_tiles(self) -> list[Cell]
-    def count_tiles(self) -> int
-    def to_dict(self) -> dict
-    def copy(self) -> Board
+```bash
+python -m rl.training.train \
+  --total-timesteps 1000000 \
+  --n-envs 8 \
+  --learning-rate 3e-4 \
+  --seed 42 \
+  --save-dir checkpoints
 ```
 
-#### BoardGenerator
+**파라미터 설명:**
+- `--total-timesteps`: 총 학습 스텝 수 (기본값: 1,000,000)
+- `--n-envs`: 병렬 환경 개수 (기본값: 8)
+- `--learning-rate`: 학습률 (기본값: 3e-4)
+- `--seed`: 랜덤 시드 (기본값: 0)
+- `--save-dir`: 체크포인트 저장 디렉토리 (기본값: checkpoints)
 
-랜덤 게임 보드를 생성합니다.
+#### 학습 재개 (체크포인트에서)
 
-```python
-class BoardGenerator:
-    @staticmethod
-    def generate_random_board() -> Board
+```bash
+python -m rl.training.train \
+  --checkpoint checkpoints/ppo_colortiles_step_50000.zip \
+  --total-timesteps 1000000
 ```
 
-### 데이터 모델
+---
 
-#### Position
+### 3. 학습 모니터링 (TensorBoard)
 
-```python
-@dataclass(frozen=True)
-class Position:
-    row: int
-    col: int
+```bash
+tensorboard --logdir logs/tensorboard/
 ```
 
-#### Cell
+그런 다음 브라우저에서 http://localhost:6006 접속
 
-```python
-@dataclass(frozen=True)
-class Cell:
-    position: Position
-    color: Optional[Color]  # None = 빈칸
+**확인 가능한 지표:**
+- Episode reward (에피소드 보상)
+- Win rate (승리 비율)
+- Mean tiles cleared (평균 제거 타일 수)
+- Episode length (에피소드 길이)
+- Policy loss, Value loss
+- Entropy (탐험 정도)
 
-    @property
-    def is_empty(self) -> bool
+---
+
+### 4. GUI에서 학습된 AI 플레이
+
+#### Step 1: GUI 실행
+
+```bash
+python main.py
 ```
 
-#### GameState
+#### Step 2: AI 설정
 
-```python
-class GameState(Enum):
-    READY = "ready"
-    PLAYING = "playing"
-    WON = "won"
-    LOST_TIME = "lost_time"
-    LOST_NO_MOVES = "lost_no_moves"
-```
+1. **체크포인트 선택**:
+   - 우측 "AI 플레이어" 패널에서 체크포인트 드롭다운 클릭
+   - 학습된 모델 선택 (예: `ppo_colortiles_best.zip`)
+   - "새로고침" 버튼으로 목록 갱신 가능
 
-#### MoveResult
+2. **AI 시작**:
+   - "AI 시작" 버튼 클릭
+   - 게임이 자동 시작되고 AI가 플레이 시작
 
-```python
-@dataclass
-class MoveResult:
-    success: bool
-    tiles_removed: list[Cell]
-    points_earned: int
-    time_penalty: float
-    message: str
-    game_state: GameState
-```
+3. **속도 조절**:
+   - 속도 슬라이더로 1-10 조절 (초당 액션 수)
+   - 1: 느림 (관찰 용이)
+   - 10: 빠름
 
-## PyQt6 GUI 통합 예제
+4. **AI 중지**:
+   - "중지" 버튼으로 언제든지 중지 가능
 
-```python
-from PyQt6.QtCore import QTimer
-from color_tiles.utils.board_generator import BoardGenerator
-from color_tiles.engine.game import GameEngine, GameObserver
-from color_tiles.domain.models import Position, GameState
+#### AI 상태 정보
 
-class PyQt6Observer(GameObserver):
-    """PyQt6 GUI를 위한 옵저버."""
+GUI에서 다음 정보 확인 가능:
+- **스텝**: 현재 에피소드의 스텝 수
+- **가치 추정**: AI가 예측한 state value
+- **행동 신뢰도**: 선택한 액션의 확률
+- **다음 행동**: AI가 선택할 위치 (row, col)
+- **하이라이트**: 보드에서 다음 액션 위치를 색상으로 표시
+  - 🟢 녹색: 높은 신뢰도 (>80%)
+  - 🟡 노란색: 중간 신뢰도 (50-80%)
+  - 🟠 주황색: 낮은 신뢰도 (<50%)
 
-    def __init__(self, ui):
-        self.ui = ui
-
-    def on_move_made(self, result):
-        """이동 완료 시 UI 업데이트."""
-        self.ui.update_board()
-        self.ui.update_score(self.ui.game.get_score())
-
-        if not result.success:
-            self.ui.show_message(result.message)
-
-    def on_game_state_changed(self, state):
-        """게임 상태 변경 시 UI 업데이트."""
-        if state == GameState.WON:
-            self.ui.show_victory_dialog()
-        elif state in [GameState.LOST_TIME, GameState.LOST_NO_MOVES]:
-            self.ui.show_game_over_dialog()
-
-    def on_time_updated(self, remaining):
-        """시간 업데이트 (QTimer에서 주기적으로 호출)."""
-        self.ui.update_timer_display(remaining)
-
-class ColorTilesUI:
-    """PyQt6 GUI 예제."""
-
-    def __init__(self):
-        # 게임 초기화
-        board = BoardGenerator.generate_random_board()
-        self.game = GameEngine(board)
-
-        # 옵저버 등록
-        self.observer = PyQt6Observer(self)
-        self.game.add_observer(self.observer)
-
-        # 타이머 설정 (100ms마다 시간 업데이트)
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_time)
-        self.timer.start(100)
-
-        # 게임 시작
-        self.game.start_game()
-
-    def update_time(self):
-        """주기적으로 남은 시간을 확인하고 UI 업데이트."""
-        remaining = self.game.get_remaining_time()
-        self.observer.on_time_updated(remaining)
-
-    def on_cell_clicked(self, row, col):
-        """셀 클릭 핸들러."""
-        position = Position(row, col)
-        result = self.game.make_move(position)
-        # 옵저버가 자동으로 UI 업데이트 수행
-
-    def update_board(self):
-        """보드 상태를 읽어 UI 업데이트."""
-        board_state = self.game.get_board_state()
-        # board_state['cells'] 사용하여 GUI 그리기
-
-    def update_score(self, score):
-        """점수 표시 업데이트."""
-        pass
-
-    def update_timer_display(self, remaining):
-        """타이머 표시 업데이트."""
-        pass
-
-    def show_victory_dialog(self):
-        """승리 다이얼로그 표시."""
-        pass
-
-    def show_game_over_dialog(self):
-        """게임 오버 다이얼로그 표시."""
-        pass
-
-    def show_message(self, message):
-        """메시지 표시."""
-        pass
-```
-
-## Observer Pattern
-
-게임 엔진은 Observer Pattern을 사용하여 GUI에 이벤트를 알립니다.
-
-```python
-from color_tiles.engine.game import GameObserver
-
-class CustomObserver(GameObserver):
-    def on_move_made(self, result):
-        """이동 완료 후 호출."""
-        print(f"Move: {result.message}")
-
-    def on_game_state_changed(self, state):
-        """게임 상태 변경 시 호출."""
-        print(f"State changed to: {state.value}")
-
-    def on_time_updated(self, remaining):
-        """시간 업데이트 시 호출."""
-        print(f"Time remaining: {remaining:.1f}s")
-
-# 옵저버 등록
-observer = CustomObserver()
-game.add_observer(observer)
-```
-
-## 핵심 알고리즘
-
-### 타일 찾기 (4방향 탐색)
-
-빈칸에서 상/하/좌/우 4방향으로 탐색하여 각 방향의 첫 번째 타일을 찾습니다.
-
-```python
-# src/color_tiles/engine/tile_finder.py:find_tiles_from_position()
-# 시간 복잡도: O(max(width, height)) × 4 = O(23) × 4 = O(92)
-```
-
-### 이동 검증
-
-찾은 타일들을 색상별로 그룹화하여 2개 이상인 색상이 있는지 확인합니다.
-
-```python
-# src/color_tiles/engine/move_validator.py:is_valid_move()
-# 시간 복잡도: O(4) for grouping
-```
-
-### 유효한 이동 탐색
-
-모든 빈칸을 순회하며 유효한 이동이 있는지 확인합니다.
-
-```python
-# src/color_tiles/engine/move_validator.py:find_all_valid_moves()
-# 시간 복잡도: O(width × height × max(width, height))
-#             = O(345 × 23) ≈ O(8,000)
-```
-
-## 성능 특성
-
-- **보드 셀 접근**: O(1)
-- **타일 찾기**: O(max(width, height)) = O(23)
-- **이동 검증**: O(4) for grouping
-- **전체 유효 이동 탐색**: O(width × height × max(width, height)) ≈ O(8,000)
-- **메모리 사용**: ~수 KB (345개 셀)
-
-실시간 게임에 충분한 성능을 제공합니다.
+---
 
 ## 프로젝트 구조
 
 ```
-color_tiles/
-├── docs/
-│   └── game_rule.md           # 게임 규칙 문서
+color-tiles-rl/
 ├── src/
-│   └── color_tiles/
-│       ├── __init__.py
-│       ├── domain/            # Domain Layer
-│       │   ├── __init__.py
-│       │   ├── constants.py
-│       │   ├── models.py
-│       │   └── exceptions.py
-│       ├── engine/            # Engine Layer
-│       │   ├── __init__.py
-│       │   ├── board.py
-│       │   ├── tile_finder.py
-│       │   ├── move_validator.py
-│       │   └── game.py
-│       └── utils/             # Utils Layer
-│           ├── __init__.py
-│           └── board_generator.py
-├── examples/
-│   └── cli_demo.py            # CLI 데모
+│   ├── color_tiles/          # 게임 엔진
+│   │   ├── domain/           # 도메인 모델 (Color, Position, GameState)
+│   │   ├── engine/           # 게임 로직 (Board, GameEngine)
+│   │   ├── gui/              # PyQt6 GUI
+│   │   │   ├── main_window.py
+│   │   │   ├── board_widget.py
+│   │   │   ├── ai_control_panel.py   # AI 제어 패널
+│   │   │   └── ai_status_panel.py    # AI 상태 표시
+│   │   └── utils/            # 유틸리티 (BoardGenerator)
+│   └── rl/                   # 강화학습 모듈
+│       ├── env/
+│       │   └── color_tiles_env.py     # Gymnasium 환경
+│       ├── training/
+│       │   ├── train.py               # 학습 스크립트
+│       │   └── callbacks.py           # 커스텀 콜백
+│       └── inference/
+│           └── ai_player.py           # AI 플레이어
+├── tests/
+│   └── test_color_tiles_env.py        # 환경 테스트
+├── checkpoints/              # 학습된 모델 저장 (자동 생성)
+├── logs/                     # TensorBoard 로그 (자동 생성)
+├── docs/
+│   └── reinforce_learning_plan.md     # RL 계획서
+├── main.py                   # GUI 실행 파일
 ├── README.md
-└── requirements.txt
+└── pyproject.toml
 ```
 
-## 🎮 PyQt6 GUI 실행하기
+---
+
+## 강화학습 환경 스펙
+
+### State (관찰 공간)
+
+- **타입**: `Box(0, 10, (15, 23), int8)`
+- **형태**: 15×23 2D 그리드
+- **값**:
+  - 0: 빈 셀
+  - 1-10: 색상 (Color enum value + 1)
+
+### Action (행동 공간)
+
+- **타입**: `Discrete(345)`
+- **범위**: 0-344 (23×15 = 345개 셀)
+- **변환**:
+  - `row = action // 23`
+  - `col = action % 23`
+
+### Reward (보상)
+
+| 상황 | 보상 |
+|------|------|
+| 타일 제거 | `+1.0 × 타일 수` |
+| 무효 이동 | `-10.0` |
+| 승리 | `+100.0` |
+| 패배 | `-(남은 타일 × 2)` |
+
+### Episode 종료
+
+- **Terminated**: 승리 (모든 타일 제거) 또는 패배 (시간 초과/막힘)
+- **Truncated**: Max steps (200) 도달
+
+---
+
+## PPO 하이퍼파라미터
+
+```python
+{
+    "learning_rate": 3e-4,
+    "n_steps": 2048,
+    "batch_size": 64,
+    "n_epochs": 10,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_range": 0.2,
+    "ent_coef": 0.01,
+    "vf_coef": 0.5,
+    "max_grad_norm": 0.5,
+}
+```
+
+---
+
+## 예상 학습 진행
+
+| 단계 | Steps | Win Rate | 평균 타일 제거 | Invalid Move Rate |
+|------|-------|----------|----------------|-------------------|
+| 초기 | 0-50K | 0-5% | 30-50 | 60-80% |
+| 초중기 | 50K-200K | 5-30% | 80-120 | 30-50% |
+| 중기 | 200K-500K | 30-60% | 140-170 | 15-25% |
+| 후기 | 500K-1M | 60-80% | 175-195 | 5-10% |
+| 수렴 | 1M+ | 80%+ | 195+ | <5% |
+
+---
+
+## 체크포인트 관리
+
+학습 중 자동으로 다음 체크포인트가 생성됩니다:
+
+```
+checkpoints/
+├── ppo_colortiles_step_10000.zip    # 10K steps
+├── ppo_colortiles_step_20000.zip    # 20K steps
+├── ...
+├── ppo_colortiles_best.zip          # 최고 성능 모델
+└── ppo_colortiles_final.zip         # 최종 모델
+```
+
+**권장 사항:**
+- `best.zip`: 평가 성능이 가장 좋은 모델 (GUI에서 사용 추천)
+- `final.zip`: 학습 완료 후 최종 모델
+- `step_*.zip`: 특정 시점의 모델 (학습 재개 시 사용)
+
+---
+
+## 테스트
+
+### 환경 테스트
 
 ```bash
-# 1. uv로 가상환경 및 의존성 설치 (처음 한 번만)
-uv venv
-uv pip install -e .
-
-# 2. GUI 실행
-uv run python main.py
-
-# 또는 가상환경 활성화 후 실행
-source .venv/bin/activate
-python main.py
+pytest tests/test_color_tiles_env.py -v
 ```
 
-### 게임 플레이 방법
-1. "게임 시작" 버튼 클릭
-2. 빈칸(밝은 회색)을 클릭하여 타일 제거
-3. 4방향에서 같은 색상 2개 이상이면 제거 성공
-4. 모든 타일을 제거하면 승리!
+### AI Player 테스트
 
-## 향후 확장 가능성
+```bash
+python -m rl.inference.ai_player checkpoints/ppo_colortiles_best.zip
+```
 
-현재 아키텍처는 다음 기능들을 지원할 수 있도록 설계되었습니다:
+---
 
-1. **Undo/Redo**: `Board.copy()`로 스냅샷 저장
-2. **Save/Load**: `Board.to_dict()`로 직렬화
-3. **Replay**: `MoveResult`에 모든 정보 포함
-4. **AI Solver**: `find_all_valid_moves()`로 유효한 이동 탐색
-5. **힌트 시스템**: `find_all_valid_moves()` 활용
-6. **난이도 조절**: 시간 제한, 패널티 조정
-7. **다른 보드 생성 전략**: `BoardGenerator` 교체
+## 트러블슈팅
 
-## 개발자 정보
+### 1. ModuleNotFoundError: No module named 'rl'
 
-- **버전**: 0.1.0
-- **Python**: 3.10+
-- **라이선스**: MIT (또는 프로젝트에 맞게 수정)
+**문제**: Python이 `rl` 패키지를 찾지 못함
 
-## 기여
+**해결**:
+```bash
+# 프로젝트 루트에서
+pip install -e .
+```
 
-이슈 리포트와 풀 리퀘스트를 환영합니다!
+### 2. stable-baselines3 not installed
 
-## 라이선스
+**문제**: RL 라이브러리가 설치되지 않음
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. (또는 프로젝트에 맞게 수정)
+**해결**:
+```bash
+pip install gymnasium stable-baselines3 torch tensorboard
+```
+
+### 3. CUDA out of memory (GPU 사용 시)
+
+**문제**: GPU 메모리 부족
+
+**해결**:
+```bash
+# CPU 사용 강제
+export CUDA_VISIBLE_DEVICES=""
+python -m rl.training.train ...
+```
+
+### 4. GUI에서 체크포인트가 보이지 않음
+
+**문제**: `checkpoints/` 디렉토리에 파일이 없음
+
+**해결**:
+1. 먼저 학습을 실행하여 체크포인트 생성
+2. GUI에서 "새로고침" 버튼 클릭
+
+---
+
+## 성능 최적화
+
+### CPU 학습 가속
+
+```bash
+# 병렬 환경 수 증가 (CPU 코어 수에 맞게)
+python -m rl.training.train --n-envs 16
+```
+
+### GPU 사용
+
+```bash
+# PyTorch가 자동으로 GPU 감지
+# device="auto"로 설정되어 있음
+python -m rl.training.train --total-timesteps 1000000
+```
+
+---
+
+## 참고 문서
+
+- **RL 계획서**: `docs/reinforce_learning_plan.md`
+- **Stable-Baselines3**: https://stable-baselines3.readthedocs.io/
+- **Gymnasium**: https://gymnasium.farama.org/
+- **PPO 논문**: https://arxiv.org/abs/1707.06347
+
+---
+
+## 라이센스
+
+이 프로젝트는 교육 목적으로 제작되었습니다.
+
+---
+
+## 작성자
+
+- Color Tiles 게임 엔진: jmlee
+- 강화학습 통합: Claude (Anthropic)
+
+---
+
+## 버전 히스토리
+
+- **v1.0.0** (2025-12-07): 초기 릴리스
+  - PPO 기반 RL 환경 구현
+  - 학습 파이프라인 구현
+  - GUI 통합 완료
